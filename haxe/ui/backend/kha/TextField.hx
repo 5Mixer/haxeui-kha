@@ -886,6 +886,16 @@ class TextField {
 
                 var charWidth = font.widthOfCharacters(fontSize, [charCode], 0, 1);
                 if (totalWidth + charWidth > width) {
+                    if (spaceIndex == -1) {
+                        // This is an unbroken line wider than the wrapped textfield.
+                        // Must wrap at character granularity, rather than word.
+						_lines.push(StringExtensions.toCharArray(text.substring(start, i)));
+						start = i;
+						totalWidth = charWidth;
+						spaceIndex = -1;
+						continue;
+                    }
+                    
                     _lines.push(StringExtensions.toCharArray(text.substring(start, spaceIndex)));
                     start = spaceIndex + 1;
                     var remain = StringExtensions.toCharArray(text.substring(spaceIndex + 1, i + 1));
