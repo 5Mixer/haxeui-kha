@@ -34,9 +34,11 @@ class TextField {
 
     private var _selectionInfo:SelectionInfo = {start: {row: -1, column: -1}, end: {row: -1, column: -1}};
     private var _caretInfo:CaretInfo = {row: -1, column: -1, visible: false, force: false, timerId: -1};
+    private var _activeMouseSelection = false;
+    private var _mouseSelectionOpenPosition = { row: -1, column: -1 };
 
     public function new() {
-        Mouse.get().notify(onMouseDown, null, null, null, null);
+        Mouse.get().notify(onMouseDown, onMouseUp, onMouseMove, null, onMouseLeave);
         Keyboard.get().notify(onKeyDown, onKeyUp, onKeyPress);
 
         // Only one cutCopyPaste is set at once, as opposed to the listener list for keyboard/mouse.
@@ -248,6 +250,9 @@ class TextField {
         _selectionInfo.start.column = -1;
         _selectionInfo.end.row = -1;
         _selectionInfo.end.column = -1;
+        
+        _mouseSelectionOpenPosition.row = -1;
+        _mouseSelectionOpenPosition.column = -1;
     }
 
     public var hasSelection(get, null):Bool;
@@ -316,6 +321,16 @@ class TextField {
     public var requiredHeight(get, null):Float;
     private function get_requiredHeight():Float {
         return _lines.length * font.height(fontSize);
+    }
+
+    private function comparePositions (positionA:CharPosition, positionB:CharPosition) {
+        if (positionA.column == positionB.column && positionA.row == positionB.row) {
+            return 0;
+        }
+        if (positionA.row > positionB.row || (positionA.row == positionB.row && positionA.column > positionB.column)) {
+            return 1;
+        }
+        return -1;
     }
 
     private function moveCaretRight() {
@@ -695,28 +710,23 @@ class TextField {
         Scheduler.removeTimeTasks(REPEAT_TIMER_GROUP);
     }
 
-    private function onMouseDown(button:Int, x:Int, y:Int) {
+    private function getCharPositionFromCoordinates(x:Int, y:Int) {
         if (_font == null || inBounds(x, y) == false) {
-            return;
+            return null;
         }
-
-        if (_currentFocus != null && _currentFocus != this) {
-            _currentFocus.onBlur();
-        }
-        _currentFocus = this;
-
+        
         var localX = x - left + scrollLeft;
         var localY = y - top;
 
-        resetSelection();
+        var pos:CharPosition = { row: 0, column: 0 };
 
-        _caretInfo.row = scrollTop + Std.int(localY / font.height(fontSize));
-        if (_caretInfo.row > _lines.length - 1) {
-            _caretInfo.row = _lines.length - 1;
+        pos.row = scrollTop + Std.int(localY / font.height(fontSize));
+        if (pos.row > _lines.length - 1) {
+            pos.row = _lines.length - 1;
         }
-        var line = _lines[_caretInfo.row];
+        var line = _lines[pos.row];
         if (line == null) {
-            return;
+            return pos;
         }
         var totalWidth:Float = 0;
         var i = 0;
@@ -724,10 +734,10 @@ class TextField {
         for (ch in line) {
             var charWidth = font.widthOfCharacters(fontSize, [ch], 0, 1);
             if (totalWidth + charWidth > localX) {
-                _caretInfo.column = i;
+                pos.column = i;
                 var delta = localX - totalWidth;
                 if (delta > charWidth * 0.6) {
-                    _caretInfo.column++;
+                    pos.column++;
                 }
                 inText = true;
                 break;
@@ -738,11 +748,73 @@ class TextField {
         }
 
         if (inText == false) {
-            _caretInfo.column = line.length;
+            pos.column = line.length;
         }
+        return pos;
+    }
+
+    private function onMouseDown(button:Int, x:Int, y:Int) {
+        if (_font == null || inBounds(x, y) == false) {
+            return;
+        }
+
+        if (_currentFocus != null && _currentFocus != this) {
+            _currentFocus.onBlur();
+        }
+        _currentFocus = this;
+        
+        resetSelection();
+
+        var position = getCharPositionFromCoordinates(x, y);
+        if (position == null) {
+            return;
+        }
+
+        _caretInfo.row = position.row;
+        _caretInfo.column = position.column;
+
+        _activeMouseSelection = true;
 
         scrollToCaret();
         _currentFocus.onFocus();
+    }
+    private function onMouseUp(button:Int, x:Int, y:Int) {
+        _activeMouseSelection = false;
+    }
+    private function onMouseMove(x:Int, y:Int, moveX:Int, moveY:Int) {
+        if (_currentFocus == this && _activeMouseSelection) {
+			var position = getCharPositionFromCoordinates(x, y);
+            var previousPosition = getCharPositionFromCoordinates(x-moveX, y-moveY);
+        
+            if (position == null || previousPosition == null) {
+                return;
+            }
+
+			_caretInfo.row = position.row;
+            _caretInfo.column = position.column;
+
+            if (!hasSelection) {
+                _mouseSelectionOpenPosition.row = previousPosition.row;
+                _mouseSelectionOpenPosition.column = previousPosition.column;
+            }
+
+            if (comparePositions(position, _mouseSelectionOpenPosition) < 0) {
+                _selectionInfo.start.row = position.row;
+                _selectionInfo.start.column = position.column;
+                _selectionInfo.end.row = _mouseSelectionOpenPosition.row;
+                _selectionInfo.end.column = _mouseSelectionOpenPosition.column;
+            } else {
+                _selectionInfo.end.row = position.row;
+                _selectionInfo.end.column = position.column;
+                _selectionInfo.start.row = _mouseSelectionOpenPosition.row;
+                _selectionInfo.start.column = _mouseSelectionOpenPosition.column;
+            }
+        }
+    }
+    private function onMouseLeave() {
+        _activeMouseSelection = false;
+        _mouseSelectionOpenPosition.row = -1;
+        _mouseSelectionOpenPosition.column = -1;
     }
 
     public function focus() {
