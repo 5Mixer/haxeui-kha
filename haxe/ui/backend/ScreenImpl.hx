@@ -72,6 +72,7 @@ class ScreenImpl extends ScreenBase {
     private var _deltaTime:Float;
     private var _lastTime:Float;
     public var fps:Float = 0;
+    public var cursorLocked:Bool = false;
     private var _fpsFont:Font = null;
     private var _fpsLowest:Float = 0xFFFFFF;
     private var _fpsHigest:Float = 0;
@@ -178,6 +179,31 @@ class ScreenImpl extends ScreenBase {
                 _mapping.remove(type);
                 Mouse.get().remove(null, __onMouseUp, null, null);
         }
+    }
+
+    public function setCursor(cursor:String, lock=false) {
+        if (cursorLocked) {
+            return;
+        }
+        cursorLocked = lock;
+
+        if (cursor == "pointer") {
+            kha.input.Mouse.get().setSystemCursor(MouseCursor.Pointer);
+        } else if (cursor == "text") {
+            kha.input.Mouse.get().setSystemCursor(MouseCursor.Text);
+        } else if (cursor == "col-resize") {
+            kha.input.Mouse.get().setSystemCursor(MouseCursor.EastWestResize);
+        } else if (cursor == "row-resize") {
+            kha.input.Mouse.get().setSystemCursor(MouseCursor.NorthSouthResize);
+        }else {
+            kha.input.Mouse.get().setSystemCursor(MouseCursor.Default);
+        }
+    }
+    public function lockCursor() {
+        cursorLocked = true;
+    }
+    public function unlockCursor() {
+        cursorLocked = false;
     }
 
     private function __onMouseMove(x:Int, y:Int, movementX:Int, movementY:Int) {

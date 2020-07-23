@@ -10,6 +10,7 @@ import haxe.ui.events.UIEvent;
 import haxe.ui.geom.Rectangle;
 import haxe.ui.styles.Style;
 import haxe.ui.util.MathUtil;
+import kha.System;
 import kha.Color;
 import kha.graphics2.Graphics;
 import kha.graphics2.ImageScaleQuality;
@@ -568,6 +569,10 @@ class ComponentImpl extends ComponentBase {
         lastMouseY = y;
         var i = inBounds(x, y);
         if (i == true && _mouseOverFlag == false) {
+            if (this.style != null) {
+                Screen.instance.setCursor(this.style.cursor);
+            }
+            
             if (hasComponentOver(cast this, x, y) == true) {
                 return;
             }
@@ -581,6 +586,7 @@ class ComponentImpl extends ComponentBase {
             }
         } else if (i == false && _mouseOverFlag == true) {
             _mouseOverFlag = false;
+            Screen.instance.setCursor("default");
             var fn:UIEvent->Void = _eventMap.get(haxe.ui.events.MouseEvent.MOUSE_OUT);
             if (fn != null) {
                 var mouseEvent = new haxe.ui.events.MouseEvent(haxe.ui.events.MouseEvent.MOUSE_OUT);
@@ -601,6 +607,11 @@ class ComponentImpl extends ComponentBase {
                 return;
             }
             _mouseDownFlag = true;
+            
+            if (this.style != null && (this.style.cursor == "row-resize" || this.style.cursor == "col-resize")) {
+                Screen.instance.lockCursor();
+            }
+
             var type = button == 0 ? haxe.ui.events.MouseEvent.MOUSE_DOWN: haxe.ui.events.MouseEvent.RIGHT_MOUSE_DOWN;
             var fn:UIEvent->Void = _eventMap.get(type);
             if (fn != null) {
@@ -615,6 +626,13 @@ class ComponentImpl extends ComponentBase {
     private function __onMouseUp(button:Int, x:Int, y:Int) {
         lastMouseX = x;
         lastMouseY = y;
+        
+        // Regardless of whether the mouse was released within the component, unlock the cursor if this component was selected
+        if (_mouseDownFlag) {
+            Screen.instance.unlockCursor();
+            Screen.instance.setCursor("default");
+        }
+        
         var i = inBounds(x, y);
         if (i == true) {
             if (hasComponentOver(cast this, x, y) == true) {
