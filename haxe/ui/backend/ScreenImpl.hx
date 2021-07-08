@@ -1,16 +1,16 @@
 package haxe.ui.backend;
 
+import haxe.ui.Toolkit;
+import haxe.ui.backend.kha.MouseHelper;
 import haxe.ui.core.Component;
 import haxe.ui.events.MouseEvent;
 import haxe.ui.events.UIEvent;
-import kha.Assets;
 import kha.Color;
 import kha.Display;
 import kha.Font;
 import kha.Scheduler;
 import kha.System;
 import kha.graphics2.Graphics;
-import kha.input.Mouse;
 
 class ScreenImpl extends ScreenBase {
     private var _mapping:Map<String, UIEvent->Void>;
@@ -27,6 +27,14 @@ class ScreenImpl extends ScreenBase {
         return System.windowHeight() / Toolkit.scaleY;
     }
 
+    private override function get_actualWidth():Float {
+        return System.windowWidth();
+    }
+
+    private override function get_actualHeight():Float {
+        return System.windowHeight();
+    }
+    
     private override function get_dpi():Float {
         return Display.primary.pixelsPerInch;
     }
@@ -50,7 +58,7 @@ class ScreenImpl extends ScreenBase {
     }
 
     public override function addComponent(component:Component):Component {
-        _topLevelComponents.push(component);
+        rootComponents.push(component);
         addResizeListener();
         resizeComponent(component);
         //component.dispatchReady();
@@ -58,12 +66,12 @@ class ScreenImpl extends ScreenBase {
     }
 
     public override function removeComponent(component:Component):Component {
-        _topLevelComponents.remove(component);
+        rootComponents.remove(component);
 		return component;
     }
 
     public function renderTo(g:Graphics) {
-        for (c in _topLevelComponents) {
+        for (c in rootComponents) {
             c.renderTo(g);
         }
         updateFPS(g);
@@ -130,9 +138,7 @@ class ScreenImpl extends ScreenBase {
 
         _hasListener = true;
         kha.Window.get(0).notifyOnResize(function(w:Int,h:Int) {
-            for (c in _topLevelComponents) {
-                resizeComponent(c);
-            }
+            resizeRootComponents();
         });
     }
 
@@ -150,17 +156,19 @@ class ScreenImpl extends ScreenBase {
             case MouseEvent.MOUSE_MOVE:
                 if (_mapping.exists(type) == false) {
                     _mapping.set(type, listener);
-                    Mouse.get().notify(null, null, __onMouseMove, null);
+                    MouseHelper.notify(MouseEvent.MOUSE_MOVE, __onMouseMove);
                 }
+                
             case MouseEvent.MOUSE_DOWN:
                 if (_mapping.exists(type) == false) {
                     _mapping.set(type, listener);
-                    Mouse.get().notify(__onMouseDown, null, null, null);
+                    MouseHelper.notify(MouseEvent.MOUSE_DOWN, __onMouseDown);
                 }
+                
             case MouseEvent.MOUSE_UP:
                 if (_mapping.exists(type) == false) {
                     _mapping.set(type, listener);
-                    Mouse.get().notify(null, __onMouseUp, null, null);
+                    MouseHelper.notify(MouseEvent.MOUSE_UP, __onMouseUp);
                 }
         }
 
@@ -170,43 +178,54 @@ class ScreenImpl extends ScreenBase {
         switch (type) {
             case MouseEvent.MOUSE_MOVE:
                 _mapping.remove(type);
-                Mouse.get().remove(null, null, __onMouseMove, null);
+                MouseHelper.remove(MouseEvent.MOUSE_MOVE, __onMouseMove);
+                
             case MouseEvent.MOUSE_DOWN:
                 _mapping.remove(type);
-                Mouse.get().remove(__onMouseDown, null, null, null);
+                MouseHelper.remove(MouseEvent.MOUSE_DOWN, __onMouseDown);
+                
             case MouseEvent.MOUSE_UP:
                 _mapping.remove(type);
-                Mouse.get().remove(null, __onMouseUp, null, null);
+                MouseHelper.remove(MouseEvent.MOUSE_UP, __onMouseUp);
         }
     }
-
-    private function __onMouseMove(x:Int, y:Int, movementX:Int, movementY:Int) {
+    
+    private function __onMouseMove(event:MouseEvent) {
         if (_mapping.exists(MouseEvent.MOUSE_MOVE) == false) {
             return;
         }
 
+        var x = event.screenX;
+        var y = event.screenY;
+        
         var mouseEvent = new MouseEvent(MouseEvent.MOUSE_MOVE);
         mouseEvent.screenX = x / Toolkit.scaleX;
         mouseEvent.screenY = y / Toolkit.scaleY;
         _mapping.get(haxe.ui.events.MouseEvent.MOUSE_MOVE)(mouseEvent);
     }
 
-    private function __onMouseDown(button:Int, x:Int, y:Int) {
+    private function __onMouseDown(event:MouseEvent) {
         if (_mapping.exists(MouseEvent.MOUSE_DOWN) == false) {
             return;
         }
 
+        var x = event.screenX;
+        var y = event.screenY;
+        
         var mouseEvent = new MouseEvent(MouseEvent.MOUSE_DOWN);
         mouseEvent.screenX = x / Toolkit.scaleX;
         mouseEvent.screenY = y / Toolkit.scaleY;
         _mapping.get(haxe.ui.events.MouseEvent.MOUSE_DOWN)(mouseEvent);
     }
 
-    private function __onMouseUp(button:Int, x:Int, y:Int) {
+    private function __onMouseUp(event:MouseEvent) {
         if (_mapping.exists(MouseEvent.MOUSE_UP) == false) {
             return;
         }
 
+        var x = event.screenX;
+        var y = event.screenY;
+        
         var mouseEvent = new MouseEvent(MouseEvent.MOUSE_UP);
         mouseEvent.screenX = x / Toolkit.scaleX;
         mouseEvent.screenY = y / Toolkit.scaleY;
